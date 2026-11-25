@@ -137,7 +137,7 @@ const GT={};function glowSprite(col,sz,op=1){const k=col;if(!GT[k]){const c=new 
 const $=id=>document.getElementById(id);const AR=n=>Math.round(n).toLocaleString("ar-EG",{useGrouping:false});const rnd=(a,b)=>a+Math.random()*(b-a);const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* ---------- save ---------- */
 const KEY="galaxy_runner_v3";
-let S={unlocked:1,stars:[0,0,0,0,0],crystals:0,up:{pow:0,rate:0,multi:0,hull:0,mag:0,bomb:0},muted:false,started:false};
+let S={ship:0,ships:[1,0,0,0],unlocked:1,stars:[0,0,0,0,0],crystals:0,up:{pow:0,rate:0,multi:0,hull:0,mag:0,bomb:0},muted:false,started:false};
 try{const o=JSON.parse(localStorage.getItem(KEY)||"null");if(o)S=Object.assign(S,o,{up:Object.assign(S.up,o.up||{})})}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 /* ---------- worlds ---------- */
@@ -148,6 +148,11 @@ const WORLDS=[
 {n:"غابة السموم",sub:"أسراب انتحارية",c1:"#6dff7a",c2:"#d4ff3a",fog:0x06200c,blobs:["rgba(40,220,80,.5)","rgba(200,255,40,.3)","rgba(20,120,60,.45)"],grid:"#5cff6a",edge:[0x66ff44,0xeeff33],pl:["#0e5a22","#3ad86a","#b6ff4a","#1a8a3a","#6aff9a"],ring:0xb6ff9a,sun:"#d8ff8c",hemi:[0xaaffaa,0x113311],tint:0x66ff77,eb:0xbaff33,props:"orb",pc:0x66ff55,speed:30,len:1200,boss:{n:"الأم السامّة",m:"boss2",tint:0x77ff55,hp:230,ring:0x9aff44,size:10.5},desc:"درونز انتحارية بتجري عليك. الزعيمة بتنده أسراب جديدة، اضرب بسرعة."},
 {n:"قلب الخلية",sub:"المعركة الأخيرة",c1:"#ff4fd8",c2:"#ff3a5a",fog:0x1c0620,blobs:["rgba(255,40,200,.5)","rgba(120,20,120,.55)","rgba(255,40,80,.35)"],grid:"#ff2fd6",edge:[0xff2fd6,0xff3a3a],pl:["#2a0828","#8a1a6a","#ff3aa8","#4a0f46","#d02a8a"],ring:0xff7ad8,sun:"#ff6ad0",hemi:[0xff99ee,0x330022],tint:0xff44cc,eb:0xff4fb0,props:"pillar",pc:0xff2fc8,speed:32,len:1300,boss:{n:"ملك الخلية",m:"boss",tint:0xff3acc,hp:330,ring:0xff4fd8,size:13},desc:"قلب الخلية. كل الأعداء مع بعض وزعيم بتلات مراحل. دي المعركة الأخيرة."}];
 const UPS=[{k:"pow",n:"قوة النار",d:"كل طلقة تضرب أقوى",max:5,ic:"🔥",c:40},{k:"rate",n:"سرعة النار",d:"طلقات أكتر في الثانية",max:5,ic:"⚡",c:40},{k:"multi",n:"أسلحة إضافية",d:"مدفع تاني وتالت",max:2,ic:"🔱",c:90},{k:"hull",n:"درع الهيكل",d:"قلب إضافي في كل مرحلة",max:3,ic:"🛡️",c:70},{k:"mag",n:"مغناطيس",d:"يسحب الكريستال من بعيد",max:3,ic:"🧲",c:35},{k:"bomb",n:"قنبلة النجم",d:"قنبلة زيادة تمسح الشاشة",max:3,ic:"💣",c:80}];
+const SHIPS=[{n:"المقاتلة",d:"متوازنة. الطيارة الأصلية",ic:"🚀",tint:null,dmg:1,rate:1,life:0,mv:1,cost:0},
+ {n:"المدمّرة",d:"ضرر +30% وقلب زيادة. حركتها أتقل",ic:"🔥",tint:0xff5a2a,dmg:1.3,rate:.92,life:1,mv:.82,cost:300},
+ {n:"الشبح",d:"نار أسرع 30% وحركة سريعة، بس قلب أقل",ic:"👻",tint:0xa27bff,dmg:.95,rate:1.3,life:-1,mv:1.3,cost:300},
+ {n:"الملكية",d:"ضرر ونار +20% وقلب زيادة. أقوى طيارة",ic:"👑",tint:0xffd23a,dmg:1.2,rate:1.2,life:1,mv:1.05,cost:1000}];
+const SH=()=>SHIPS[S.ship]||SHIPS[0];
 const upCost=u=>Math.round(u.c*(1+S.up[u.k]*1.15)*(1+S.up[u.k]*.35));
 /* ---------- audio ---------- */
 let AC=null;
@@ -215,7 +220,7 @@ function applyTheme(i){wi=i;theme=WORLDS[i];const T=theme;
 let st="load",phase="",phaseT=0,sx=0,tgx=0,speed=24,runDist=0,stageLen=900,lives=3,maxLives=3,inv=0,shield=0,rapid=0,bombs=1,earned=0,lost=0,score=0,kills=0;
 let objs=[],buls=[],ebs=[],parts=[],waves=[],fx=[],boss=null,beam=null,fireCd=0,dirT=1,shake=0,msgT=0,curStage=0,selStage=0,slow=1,keys={};
 let G_god=false;let pierce=0,spread=0,combo=0,endlessMode=false,bestCombo=0;const PUS=new Set(["coin","hp","sh","rf","pc","sp"]);
-const dmgOf=()=>1+S.up.pow*.55,cdOf=()=>(.24-S.up.rate*.028)*(rapid>0?.6:1);
+const dmgOf=()=>(1+S.up.pow*.55)*SH().dmg,cdOf=()=>(.24-S.up.rate*.028)*(rapid>0?.6:1)/SH().rate;
 function banner(h,p,ms=2200,col){const b=$("banner");b.querySelector("h2").textContent=h;b.querySelector("p").textContent=p||"";if(col)b.querySelector("h2").style.color=col;else b.querySelector("h2").style.color="#fff";b.style.opacity=1;msgT=ms/1000}
 function setVars(){const r=document.documentElement.style;r.setProperty("--c1",theme.c1);r.setProperty("--c2",theme.c2)}
 function clearAll(){[objs,buls,ebs,parts,waves,fx].forEach(a=>a.forEach(o=>scene.remove(o.m)));objs=[];buls=[];ebs=[];parts=[];waves=[];fx=[];if(boss){scene.remove(boss.m);boss=null}if(beam){scene.remove(beam.m);beam=null}$("bossbar").style.display="none"}
@@ -293,10 +298,10 @@ function update(dt){
  if(st!="play"){ship.position.set(0,(st=="title"?2.2:.8)+Math.sin(tt/400)*.12,st=="title"?3:0);ship.rotation.z=Math.sin(tt/900)*.15;ship.userData.cone.scale.set(1,.7+Math.random()*.6,1);return}
  // play
  phaseT-=dt;
- if(keys.l)tgx-=14*dt;if(keys.r)tgx+=14*dt;tgx=clamp(tgx,-XMAX,XMAX);
+ if(keys.l)tgx-=14*SH().mv*dt;if(keys.r)tgx+=14*SH().mv*dt;tgx=clamp(tgx,-XMAX,XMAX);
  const sp=speed;
  inv-=dt;shield-=dt;rapid-=dt;pierce-=dt;spread-=dt;
- sx+=(tgx-sx)*Math.min(1,dt*16);ship.position.x=sx;ship.rotation.z=(tgx-sx)*.14;ship.position.y=.8+Math.sin(tt/250)*.08;
+ sx+=(tgx-sx)*Math.min(1,dt*16*SH().mv);ship.position.x=sx;ship.rotation.z=(tgx-sx)*.14;ship.position.y=.8+Math.sin(tt/250)*.08;
  if(phase!="dead")ship.visible=inv<=0||Math.floor(tt/70)%2==0;
  ship.userData.shield.visible=shield>0;{const fs=1.2+Math.random()*.5;ship.userData.flame.scale.set(fs,fs,1);ship.userData.cone.scale.set(1,.7+Math.random()*.7,1)}
  if(phase=="intro"){if(phaseT<=0){phase="run";hudHearts()}}
@@ -349,7 +354,7 @@ function buildMap(){const box=$("mapBox");box.querySelectorAll(".node").forEach(
   n.innerHTML=`<div class="pl" style="background:radial-gradient(circle at 32% 30%,${W.pl[2]},${W.pl[1]} 45%,${W.pl[0]})">${lock?"🔒":i==4?"👾":AR(i+1)}</div><div class="nm" style="color:${lock?"#889":W.c1}">${W.n}</div><div class="stars">${lock?"":"★".repeat(S.stars[i])+"☆".repeat(3-S.stars[i])}</div>`;
   n.onclick=()=>{if(lock){n.animate([{transform:"translateX(-50%) translateX(-6px)"},{transform:"translateX(-50%) translateX(6px)"},{transform:"translateX(-50%)"}],{duration:200});return}selStage=i;applyTheme(i);setVars();box.querySelectorAll(".node").forEach(x=>x.classList.remove("sel"));n.classList.add("sel");openBrief(i)};box.appendChild(n)})}
 function openBrief(i){const W=WORLDS[i];$("bT").textContent=(i+1<5?"المرحلة "+AR(i+1)+": ":"المرحلة الأخيرة: ")+W.n;$("bD").textContent=W.desc;$("bB").textContent="☠ الزعيم: "+W.boss.n+(S.stars[i]?"   ·   أفضل تقييم: "+"★".repeat(S.stars[i]):"");$("brief").classList.add("on")}
-function startStage(i,en){endlessMode=!!en;curStage=i;applyTheme(i);setVars();clearAll();const T=WORLDS[i];sx=0;tgx=0;stageLen=endlessMode?1e9:T.len;speed=T.speed;runDist=0;maxLives=4+S.up.hull;lives=maxLives;inv=0;shield=0;rapid=0;pierce=0;spread=0;combo=0;bombs=1+S.up.bomb;earned=0;lost=0;score=0;dirT=1.2;fireCd=.3;ship.visible=true;phase="intro";phaseT=2.4;st="play";show(null);$("sn").textContent=(i+1)+"/٥ · "+T.n;$("sn").textContent=AR(i+1)+" / ٥  ·  "+T.n;$("prog").firstChild.style.width="0";hudHearts();banner(i==4?"المرحلة الأخيرة":"المرحلة "+AR(i+1),T.n+" · "+T.sub,2300,T.c1)}
+function startStage(i,en){endlessMode=!!en;curStage=i;applyTheme(i);setVars();clearAll();const T=WORLDS[i];sx=0;tgx=0;stageLen=endlessMode?1e9:T.len;speed=T.speed;runDist=0;maxLives=Math.max(2,4+S.up.hull+SH().life);lives=maxLives;inv=0;shield=0;rapid=0;pierce=0;spread=0;combo=0;bombs=1+S.up.bomb;earned=0;lost=0;score=0;dirT=1.2;fireCd=.3;ship.visible=true;phase="intro";phaseT=2.4;st="play";show(null);$("sn").textContent=(i+1)+"/٥ · "+T.n;$("sn").textContent=AR(i+1)+" / ٥  ·  "+T.n;$("prog").firstChild.style.width="0";hudHearts();banner(i==4?"المرحلة الأخيرة":"المرحلة "+AR(i+1),T.n+" · "+T.sub,2300,T.c1)}
 function finish(win){st="result";const i=curStage;if(endlessMode)earned+=Math.floor(runDist/80);let stars=0,bonus=0;if(win){stars=lost==0?3:lost<=1?2:1;const first=S.stars[i]==0;bonus=(first?40:15)+stars*(first?15:5);S.stars[i]=Math.max(S.stars[i],stars);if(S.unlocked<=i+1&&i<4)S.unlocked=i+2;if(i==4)S.beaten=true}
  S.crystals+=earned+bonus;S.started=true;save();clearAll();ship.visible=true;
  $("rT").textContent=win?(i==4?"🎉 هزمت ملك الخلية!":"✔ المرحلة خلصت"):"💥 السفينة اتدمرت";$("rT").style.color=win?"#8fff9a":"#ff6a6a";
@@ -362,7 +367,14 @@ function finish(win){st="result";const i=curStage;if(endlessMode)earned+=Math.fl
  show("result")}
 function toShop(back){st="shop";shopBack=back;buildShop();show("shop")}
 let shopBack=0;
-function buildShop(){$("shopCr").textContent="✦ "+AR(S.crystals);const g=$("shopGrid");g.innerHTML="";UPS.forEach(u=>{const lv=S.up[u.k],max=lv>=u.max,c=upCost(u);const d=document.createElement("div");d.className="card";d.innerHTML=`<div class="ic">${u.ic}</div><b>${u.n}</b><small>${u.d}</small><div class="pips">${"●".repeat(lv)}${"○".repeat(u.max-lv)}</div>`;const b=document.createElement("button");b.className="buy";b.disabled=max||S.crystals<c;b.textContent=max?"أقصى مستوى":"✦ "+AR(c);b.onclick=()=>{if(S.crystals>=c&&S.up[u.k]<u.max){S.crystals-=c;S.up[u.k]++;save();sfx("power");buildShop()}};d.appendChild(b);g.appendChild(d)})}
+function applyShip(){const u=ship.userData;if(!u.body)return;ship.remove(u.body);let b=mk("ship",3.6,Math.PI,SH().tint,.55,.35);if(!b){b=new THREE.Mesh(new THREE.ConeGeometry(.6,2,5),new THREE.MeshStandardMaterial({color:SH().tint||0x33ddff}));b.rotation.x=-Math.PI/2}ship.add(b);u.body=b}
+function buildShop(){$("shopCr").textContent="✦ "+AR(S.crystals);const g=$("shopGrid");g.innerHTML="";
+ {const h=document.createElement("div");h.style.cssText="grid-column:1/-1;font-weight:900;color:#7ff;margin:4px 0";h.textContent="🛸 الهنجر: اختار طيارتك";g.appendChild(h);
+  SHIPS.forEach((sp,i)=>{const own=S.ships[i],sel=S.ship==i;const d=document.createElement("div");d.className="card";d.style.cssText=sel?"border-color:#7ff;box-shadow:0 0 14px #7ff8":"";d.innerHTML=`<div class="ic">${sp.ic}</div><b>${sp.n}</b><small>${sp.d}</small>`;
+   const b=document.createElement("button");b.className="buy";b.disabled=sel||(!own&&S.crystals<sp.cost);b.textContent=sel?"✔ مختارة":own?"اختار":"✦ "+AR(sp.cost);
+   b.onclick=()=>{if(!own){if(S.crystals<sp.cost)return;S.crystals-=sp.cost;S.ships[i]=1}S.ship=i;save();sfx("power");applyShip();buildShop()};d.appendChild(b);g.appendChild(d)});
+  const h2=document.createElement("div");h2.style.cssText="grid-column:1/-1;font-weight:900;color:#7ff;margin:8px 0 4px";h2.textContent="🔧 ترقيات";g.appendChild(h2)}
+UPS.forEach(u=>{const lv=S.up[u.k],max=lv>=u.max,c=upCost(u);const d=document.createElement("div");d.className="card";d.innerHTML=`<div class="ic">${u.ic}</div><b>${u.n}</b><small>${u.d}</small><div class="pips">${"●".repeat(lv)}${"○".repeat(u.max-lv)}</div>`;const b=document.createElement("button");b.className="buy";b.disabled=max||S.crystals<c;b.textContent=max?"أقصى مستوى":"✦ "+AR(c);b.onclick=()=>{if(S.crystals>=c&&S.up[u.k]<u.max){S.crystals-=c;S.up[u.k]++;save();sfx("power");buildShop()}};d.appendChild(b);g.appendChild(d)})}
 /* ---------- input ---------- */
 let dragX=null,dragT=0;const cv=renderer.domElement;
 cv.addEventListener("pointerdown",e=>{if(st!="play")return;dragX=e.clientX;dragT=tgx});
@@ -373,6 +385,7 @@ addEventListener("keyup",e=>{const k=e.key.toLowerCase();if(k=="arrowleft"||k=="
 $("bombBtn").addEventListener("pointerdown",e=>{e.stopPropagation();bomb()});
 function pauseGame(){if(st=="play"){st="paused";show("pausem")}else if(st=="paused")resumeGame()}
 function resumeGame(){st="play";$("pausem").classList.remove("on");$("hud").classList.add("on");$("pause").style.display="block";$("bombBtn").style.display="block"}
+document.addEventListener("visibilitychange",()=>{if(document.hidden&&st=="play")pauseGame()});
 $("pause").onclick=pauseGame;$("pResume").onclick=resumeGame;$("pQuit").onclick=()=>toMap(curStage);
 $("endl").onclick=()=>{S.started=true;save();startStage(0,true)};$("play").onclick=()=>{S.started=true;save();toMap()};$("reset").onclick=()=>{if(confirm("تبدأ الحملة من الأول وتمسح التقدم؟")){S={unlocked:1,stars:[0,0,0,0,0],crystals:0,up:{pow:0,rate:0,multi:0,hull:0,mag:0,bomb:0},muted:S.muted,started:false};save();toTitle()}};
 $("mute").onclick=()=>{S.muted=!S.muted;save();$("mute").textContent=S.muted?"🔇 الصوت":"🔊 الصوت"};
@@ -392,9 +405,10 @@ function botStep(){// dodge: avoid enemy bullets & rocks near, else aim
  let tgt=null;if(boss&&boss.ready)tgt=boss.x;else{const t=objs.filter(o=>(o.t=="drone"||o.t=="kami")&&o.z<-6).sort((a,b)=>b.z-a.z)[0];const c=objs.filter(o=>o.t=="coin"&&o.z<-3&&o.z>-30).sort((a,b)=>b.z-a.z)[0];tgt=t?t.m.position.x:c?c.x:0}
  const danger=[...ebs.filter(e=>e.z>-22&&e.z<2),...objs.filter(o=>(o.t=="rock"||o.t=="drone"||o.t=="kami")&&o.z>-24&&o.z<2)];let best=tgt,bs=1e9;for(let x=-XMAX;x<=XMAX;x+=.5){let pen=Math.abs(x-tgt)*.6;for(const d of danger){const dx=Math.abs((d.m?d.m.position.x:d.x)-x);const lim=d.t=="rock"||d.t=="drone"||d.t=="kami"?2.8:1.8;if(dx<lim)pen+=(lim-dx)*(30-Math.abs(d.z))*1.5}if(beam&&Math.abs(beam.x-x)<2.4)pen+=200;pen+=Math.abs(x-tgx)*.15;if(pen<bs){bs=pen;best=x}}tgx=best}
 setInterval(()=>{if(window.__bot&&st=="play")botStep()},50);
-modelsReady.then(()=>{$("load").style.display="none";toTitle()});
+modelsReady.then(()=>{if(!Array.isArray(S.ships))S.ships=[1,0,0,0];S.ships[0]=1;if(!SHIPS[S.ship])S.ship=0;applyShip();$("load").style.display="none";toTitle()});
 requestAnimationFrame(frame);
 </script>
 </body>
 </html>
+
 
