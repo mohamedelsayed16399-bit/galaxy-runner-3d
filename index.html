@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#02040f">
+<title>عدّاء المجرة 3D - Galaxy Runner</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:none}
+html,body{margin:0;height:100%;background:#02040f;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;color:#fff}
+canvas{display:block;position:fixed;inset:0}
+#hud{position:fixed;top:0;left:0;right:0;padding:10px 14px;display:flex;justify-content:space-between;font-size:20px;font-weight:800;text-shadow:0 0 10px #0af;pointer-events:none}
+#boss{position:fixed;top:44px;left:20%;right:20%;height:12px;border:2px solid #f44;border-radius:8px;overflow:hidden;display:none;background:#0008}
+#boss i{display:block;height:100%;background:#f44;width:100%}
+#msg{position:fixed;top:28%;left:0;right:0;text-align:center;font-size:34px;font-weight:900;text-shadow:0 0 18px #0af;pointer-events:none;opacity:0;transition:opacity .4s}
+.ov{position:fixed;inset:0;background:radial-gradient(#0a1a4acc,#02040ff0);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:20px;z-index:5}
+.ov.on{display:flex}
+.ov h1{font-size:42px;margin:0;color:#4df;text-shadow:0 0 24px #08f}
+.ov p{margin:0;color:#b6c8ff;max-width:420px;line-height:1.8}
+.btn{background:linear-gradient(90deg,#08f,#4fd);color:#021;border:0;border-radius:40px;padding:16px 44px;font-size:22px;font-weight:900;font-family:inherit}
+</style>
+</head>
+<body>
+<div id="hud"><span id="lv"></span><span id="sc"></span><span id="lf"></span></div>
+<div id="boss"><i></i></div>
+<div id="msg"></div>
+<div class="ov on" id="start"><h1>🚀 عدّاء المجرة</h1><p>اسحب يمين وشمال (أو الأسهم) لتغيير المسار. سفينتك بتضرب أوتوماتيك: دمّر الصخور والدرونز، اجمع الكريستال، وخلّص كل مرحلة بتدمير الزعيم.</p><button class="btn" id="go">انطلق</button></div>
+<div class="ov" id="end"><h1 style="color:#f55">تحطمت!</h1><p id="ep"></p><button class="btn" id="again">العب تاني</button></div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from "three";
+const $=id=>document.getElementById(id);const AR=n=>Math.round(n).toLocaleString("ar-EG",{useGrouping:false});const rnd=(a,b)=>a+Math.random()*(b-a);
+const LANE=3.2,FAR=-130;
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x02040f);scene.fog=new THREE.Fog(0x02040f,30,125);
+const cam=new THREE.PerspectiveCamera(70,1,.1,300);
+scene.add(new THREE.HemisphereLight(0x88aaff,0x221144,1.3));const dl=new THREE.DirectionalLight(0xffffff,1.5);dl.position.set(4,10,6);scene.add(dl);
+// road: moving segments
+const segs=[];const sg=new THREE.BoxGeometry(LANE*3+1.5,.3,10),sm=new THREE.MeshStandardMaterial({color:0x0b1a3a});
+const lm=new THREE.MeshBasicMaterial({color:0x22ccff}),pm2=new THREE.MeshBasicMaterial({color:0xff22cc});
+for(let i=0;i<16;i++){const g=new THREE.Group();const b=new THREE.Mesh(sg,sm);g.add(b);
+  for(const x of[-LANE*1.5,LANE*1.5]){const l=new THREE.Mesh(new THREE.BoxGeometry(.25,.5,10),i%2?lm:pm2);l.position.set(x,.2,0);g.add(l)}
+  for(const x of[-LANE/2,LANE/2]){const d=new THREE.Mesh(new THREE.BoxGeometry(.1,.05,3),new THREE.MeshBasicMaterial({color:0x335577}));d.position.set(x,.18,0);g.add(d)}
+  g.position.set(0,-.15,-i*10+10);scene.add(g);segs.push(g)}
+// stars
+const sp=[];for(let i=0;i<600;i++)sp.push(rnd(-80,80),rnd(-10,50),rnd(-150,10));const stg=new THREE.BufferGeometry();stg.setAttribute("position",new THREE.Float32BufferAttribute(sp,3));
+const stars=new THREE.Points(stg,new THREE.PointsMaterial({color:0xffffff,size:.45,fog:false}));scene.add(stars);
+// planet decor
+const planet=new THREE.Mesh(new THREE.SphereGeometry(30,24,18),new THREE.MeshStandardMaterial({color:0x6a2cff,emissive:0x2a0a77,flatShading:true}));planet.position.set(-70,25,-140);scene.add(planet);
+// ship
+const ship=new THREE.Group();
+{const b=new THREE.Mesh(new THREE.ConeGeometry(.6,2,5),new THREE.MeshStandardMaterial({color:0x33ddff,emissive:0x0077aa,emissiveIntensity:.8,flatShading:true}));b.rotation.x=-Math.PI/2;ship.add(b);
+ const w=new THREE.Mesh(new THREE.BoxGeometry(2.4,.12,.9),new THREE.MeshStandardMaterial({color:0xff33cc,emissive:0xaa0088}));w.position.z=.5;ship.add(w);
+ const f=new THREE.Mesh(new THREE.ConeGeometry(.25,1,8),new THREE.MeshBasicMaterial({color:0xffaa33}));f.rotation.x=Math.PI/2;f.position.z=1.5;ship.add(f);ship.userData.flame=f}
+ship.position.set(0,.8,0);scene.add(ship);
+const rockG=new THREE.DodecahedronGeometry(1.1),rockM=new THREE.MeshStandardMaterial({color:0x8b6f5a,flatShading:true});
+const droneG=new THREE.OctahedronGeometry(.9),droneM=new THREE.MeshStandardMaterial({color:0xff3355,emissive:0x990022,flatShading:true});
+const coinG=new THREE.OctahedronGeometry(.45),coinM=new THREE.MeshStandardMaterial({color:0xffe066,emissive:0xcc9900});
+const bossG=new THREE.IcosahedronGeometry(3.2),bossM=new THREE.MeshStandardMaterial({color:0xaa00ff,emissive:0x550088,flatShading:true});
+const bulG=new THREE.SphereGeometry(.2,6,6),bulM=new THREE.MeshBasicMaterial({color:0x88ffff}),ebM=new THREE.MeshBasicMaterial({color:0xff3366});
+const pGeo=new THREE.BoxGeometry(.2,.2,.2);
+let st="menu",lane=1,sx=0,speed,dist,level,score,lives,objs=[],buls=[],ebs=[],parts=[],fireCd=0,spawnCd=0,inv=0,boss=null,lvDist,msgT=0,shake=0,crystals=0;
+const LANES=[-LANE,0,LANE];
+function say(t,ms=1600){const m=$("msg");m.textContent=t;m.style.opacity=1;msgT=ms/1000}
+function clear(){[objs,buls,ebs,parts].forEach(a=>a.forEach(o=>scene.remove(o.m)));objs=[];buls=[];ebs=[];parts=[];if(boss){scene.remove(boss.m);boss=null}$("boss").style.display="none"}
+function newGame(){clear();lane=1;sx=0;level=1;score=0;lives=3;dist=0;lvDist=0;speed=22;inv=0;crystals=0;st="play";say("المرحلة ١");hud()}
+function hud(){$("lv").textContent="المرحلة "+AR(level);$("sc").textContent=AR(score)+" ✦"+AR(crystals);$("lf").textContent="❤️".repeat(Math.max(0,lives))}
+function spawn(z){const l=Math.floor(Math.random()*3),r=Math.random();let o;
+  if(r<.5){const m=new THREE.Mesh(rockG,rockM);m.scale.setScalar(rnd(.9,1.4));o={t:"rock",hp:2+Math.floor(level/3),r:1.3}}
+  else if(r<.75){const m=new THREE.Mesh(droneG,droneM);o={t:"drone",hp:1+Math.floor(level/4),r:1,ph:rnd(0,6)}}
+  else{const m=new THREE.Mesh(coinG,coinM);o={t:"coin",hp:99,r:.9}}
+  const m=new THREE.Mesh(o.t=="rock"?rockG:o.t=="drone"?droneG:coinG,o.t=="rock"?rockM:o.t=="drone"?droneM:coinM);if(o.t=="rock")m.scale.setScalar(rnd(.9,1.4));
+  o.m=m;o.x=LANES[l];o.z=z;o.l=l;m.position.set(o.x,.9,z);scene.add(m);objs.push(o)}
+function boom(p,col,n=10){for(let i=0;i<n&&parts.length<200;i++){const m=new THREE.Mesh(pGeo,new THREE.MeshBasicMaterial({color:col}));m.position.copy(p);scene.add(m);parts.push({m,v:new THREE.Vector3(rnd(-6,6),rnd(0,6),rnd(-6,6)),l:.6})}}
+function hurt(){if(inv>0)return;lives--;inv=1.5;shake=.5;boom(ship.position,0xff4422,14);hud();if(lives<=0){st="end";$("ep").textContent="وصلت المرحلة "+AR(level)+" · نقاطك "+AR(score)+" · كريستال "+AR(crystals);$("end").classList.add("on")}}
+function spawnBoss(){const m=new THREE.Mesh(bossG,bossM);m.position.set(0,2.5,FAR);scene.add(m);const hp=40+level*22;boss={m,hp,max:hp,z:FAR,cd:2,x:0,tx:0};$("boss").style.display="block";say("⚠ الزعيم!",2000)}
+function update(dt){
+  if(msgT>0){msgT-=dt;if(msgT<=0)$("msg").style.opacity=0}
+  if(st!="play")return;
+  inv-=dt;const sp=speed;dist+=sp*dt;
+  sx+=(LANES[lane]-sx)*Math.min(1,dt*14);ship.position.x=sx;ship.rotation.z=(LANES[lane]-sx)*.12;ship.visible=inv<=0||Math.floor(performance.now()/70)%2==0;ship.userData.flame.scale.y=.8+Math.random()*.5;
+  for(const s of segs){s.position.z+=sp*dt;if(s.position.z>14)s.position.z-=160}
+  stars.position.z=(stars.position.z+sp*dt*.15)%60;
+  // fire
+  fireCd-=dt;if(fireCd<=0){fireCd=.2;const m=new THREE.Mesh(bulG,bulM);m.position.set(sx,.9,-1);scene.add(m);buls.push({m,x:sx,z:-1,l:2})}
+  for(const b of buls){b.z-=70*dt;b.l-=dt;b.m.position.z=b.z}
+  // spawn
+  if(!boss&&lvDist<900){spawnCd-=dt;if(spawnCd<=0){spawn(FAR);if(Math.random()<.35)spawn(FAR-rnd(4,12));spawnCd=rnd(.55,1.1)*22/Math.max(sp,22)*1.3}}
+  if(!boss)lvDist+=sp*dt;
+  if(!boss&&lvDist>=900&&!objs.some(o=>o.t!="coin"))spawnBoss();
+  // objects
+  for(const o of objs){o.z+=sp*dt;o.m.position.z=o.z;o.m.rotation.y+=dt*2;o.m.rotation.x+=dt;
+    if(o.t=="drone"){o.m.position.x=o.x+Math.sin(performance.now()/400+o.ph)*1.2;o.m.position.y=.9+Math.sin(performance.now()/300+o.ph)*.3}
+    if(o.t=="coin"){o.m.position.y=.9+Math.sin(performance.now()/200)*.2}
+    const px=o.m.position.x;
+    for(const b of buls){if(!b.dead&&o.t!="coin"&&Math.abs(b.z-o.z)<1.2&&Math.abs(b.x-px)<1.1){b.dead=true;o.hp--;boom(b.m.position,0xffffff,2);if(o.hp<=0){o.dead=true;score+=o.t=="rock"?10:20;boom(o.m.position,o.t=="rock"?0xcc9966:0xff4466,12);hud()}}}
+    if(!o.dead&&Math.abs(o.z)<1.6&&Math.abs(px-sx)<1.5){if(o.t=="coin"){o.dead=true;crystals++;score+=5;boom(o.m.position,0xffe066,6);hud()}else{o.dead=true;boom(o.m.position,0xff8844,10);hurt()}}
+    if(o.z>8)o.dead=true}
+  objs=objs.filter(o=>{if(o.dead){scene.remove(o.m);return false}return true});
+  // boss
+  if(boss){boss.z=Math.min(-30,boss.z+sp*dt*.8);boss.m.position.z=boss.z;boss.m.rotation.y+=dt;boss.m.rotation.x+=dt*.5;
+    boss.tx=LANES[Math.floor((performance.now()/2200)%3)];boss.x+=(boss.tx-boss.x)*dt*2;boss.m.position.x=boss.x;
+    boss.cd-=dt;if(boss.cd<=0&&boss.z>=-32){boss.cd=Math.max(.7,1.6-level*.1);const n=Math.random()<.5?1:2;for(let i=0;i<n;i++){const l=Math.floor(Math.random()*3);const m=new THREE.Mesh(new THREE.SphereGeometry(.6,8,8),ebM);m.position.set(LANES[l],.9,boss.z);scene.add(m);ebs.push({m,x:LANES[l],z:boss.z})}}
+    for(const b of buls){if(!b.dead&&Math.abs(b.z-boss.z)<3.2&&Math.abs(b.x-boss.x)<3.2){b.dead=true;boss.hp--;boom(b.m.position,0xcc66ff,2)}}
+    $("boss").firstChild.style.width=Math.max(0,boss.hp/boss.max*100)+"%";
+    if(boss.hp<=0){boom(boss.m.position,0xcc66ff,50);scene.remove(boss.m);boss=null;$("boss").style.display="none";score+=200*level;level++;lvDist=0;speed=Math.min(48,speed+3);ebs.forEach(e=>scene.remove(e.m));ebs=[];lives=Math.min(5,lives+1);say("المرحلة "+AR(level)+" ✔ +❤️",2000);hud()}}
+  for(const e of ebs){e.z+=(sp*.7+14)*dt;e.m.position.z=e.z;if(Math.abs(e.z)<1.2&&Math.abs(e.x-sx)<1.4){e.dead=true;hurt()}if(e.z>8)e.dead=true}
+  ebs=ebs.filter(e=>{if(e.dead){scene.remove(e.m);return false}return true});
+  buls=buls.filter(b=>{if(b.l<=0||b.dead){scene.remove(b.m);return false}return true});
+  for(const p of parts){p.l-=dt;p.v.y-=12*dt;p.m.position.addScaledVector(p.v,dt);p.m.scale.setScalar(Math.max(.01,p.l*1.6))}
+  parts=parts.filter(p=>{if(p.l<=0){scene.remove(p.m);return false}return true});
+  score+=0;
+}
+let last=performance.now();
+function frame(t){const dt=Math.min(.05,(t-last)/1000);last=t;update(dt);shake=Math.max(0,shake-dt*2);
+  cam.position.set(sx*.6+(Math.random()-.5)*shake,5.6,11);cam.lookAt(sx*.4,0.5,-14);renderer.render(scene,cam);requestAnimationFrame(frame)}
+function resize(){renderer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.fov=innerWidth<innerHeight?80:62;cam.updateProjectionMatrix()}
+addEventListener("resize",resize);resize();
+const mv=d=>{if(st=="play")lane=Math.max(0,Math.min(2,lane+d))};
+addEventListener("keydown",e=>{const k=e.key.toLowerCase();if(k=="arrowleft"||k=="a")mv(-1);if(k=="arrowright"||k=="d")mv(1)});
+let tx=null,ty=null;
+addEventListener("pointerdown",e=>{tx=e.clientX;ty=e.clientY;tapStart=e.clientX});let tapStart=0;
+addEventListener("pointermove",e=>{if(tx!==null&&Math.abs(e.clientX-tx)>32){mv(e.clientX>tx?1:-1);tx=e.clientX}});
+addEventListener("pointerup",e=>{if(tx!==null&&Math.abs(e.clientX-tapStart)<12&&st=="play")mv(e.clientX>innerWidth/2?1:-1);tx=null});
+$("go").onclick=()=>{$("start").classList.remove("on");newGame()};$("again").onclick=()=>{$("end").classList.remove("on");newGame()};
+window.G={get s(){return{st,level,score,lives,crystals,objs:objs.length,boss:boss?boss.hp:null,lane,dist:Math.round(dist)}},start:()=>$("go").click(),mv,skip(){lvDist=900;objs.forEach(o=>o.dead=true)},god(){lives=99},aim(){const o=objs.filter(o=>o.t!="coin").sort((a,b)=>b.z-a.z)[0];if(o)lane=o.l}};
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
