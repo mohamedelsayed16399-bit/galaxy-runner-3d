@@ -212,6 +212,17 @@ const ship=new THREE.Group();
  const f2=new THREE.Mesh(new THREE.ConeGeometry(.28,2.2,10),new THREE.MeshBasicMaterial({color:0x66ddff,transparent:true,opacity:.85,blending:THREE.AdditiveBlending}));f2.rotation.x=Math.PI/2;f2.position.z=2.6;ship.add(f2);ship.userData.cone=f2;
  const sh=new THREE.Mesh(new THREE.SphereGeometry(2.6,24,16),new THREE.MeshBasicMaterial({color:0x44aaff,transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false}));sh.visible=false;ship.add(sh);ship.userData.shield=sh}
 ship.position.set(0,.8,0);scene.add(ship);
+/* ---------- ambient world particles ---------- */
+var ambPts=null,ambV=null,ambK=0;
+function setAmbient(i){if(ambPts){scene.remove(ambPts);ambPts.geometry.dispose();ambPts.material.dispose();ambPts=null}ambK=i;
+ const C=[{n:120,c:0xcfe8ff,s:.16,o:.7},{n:190,c:0xff8a2a,s:.34,o:.9},{n:260,c:0xffffff,s:.3,o:.9},{n:170,c:0xb6ff4a,s:.36,o:.85},{n:150,c:0xff5ad8,s:.38,o:.85}][i];if(!C)return;
+ const p=new Float32Array(C.n*3);ambV=new Float32Array(C.n);for(let j=0;j<C.n;j++){p[j*3]=rnd(-24,24);p[j*3+1]=rnd(-1,17);p[j*3+2]=rnd(-70,12);ambV[j]=rnd(.5,1.6)}
+ const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(p,3));
+ ambPts=new THREE.Points(g,new THREE.PointsMaterial({color:C.c,size:C.s,transparent:true,opacity:C.o,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,map:glowTex("#ffffff","rgba(255,255,255,0)")}));ambPts.frustumCulled=false;scene.add(ambPts)}
+function updAmbient(dt,sp){if(!ambPts)return;const a=ambPts.geometry.attributes.position,n=ambV.length,k=ambK,tt=performance.now()/1000;
+ for(let j=0;j<n;j++){let x=a.getX(j),y=a.getY(j),z=a.getZ(j);z+=sp*.55*dt*ambV[j];
+  if(k==1)y+=ambV[j]*2.6*dt,x+=Math.sin(tt*2+j)*dt*.8;else if(k==2)y-=ambV[j]*2.2*dt,x+=Math.sin(tt+j)*dt*1.2;else if(k==3)y+=Math.sin(tt*1.3+j)*dt*.9,x+=Math.cos(tt*.9+j)*dt*.9;else if(k==4)y+=ambV[j]*1.4*dt;else y+=Math.sin(tt+j)*dt*.2;
+  if(z>12){z=-70;x=rnd(-24,24)}if(y>17)y=-1;if(y<-1)y=17;a.setXYZ(j,x,y,z)}a.needsUpdate=true}
 /* ---------- themes ---------- */
 let wi=0,theme=WORLDS[0];
 function applyTheme(i){wi=i;theme=WORLDS[i];const T=theme;
@@ -240,6 +251,7 @@ function applyTheme(i){wi=i;theme=WORLDS[i];const T=theme;
   const w=new THREE.Group();w.add(m);const off=rnd(7.5,20);w.position.set(side*off,kind=="rock"?rnd(-1,10):0,-j*5.6+10);w.rotation.set(0,rnd(0,6),0);if(kind=="rock")w.rotation.set(rnd(0,6),rnd(0,6),rnd(0,6));propGroup.add(w);props.push(w)}
  // light accent
  dl.color.set(i==0?0xffffff:T.pc||T.tint||0xffffff);
+ setAmbient(i);
 }
 /* ---------- game state ---------- */
 let st="load",phase="",phaseT=0,sx=0,tgx=0,speed=24,runDist=0,stageLen=900,lives=3,maxLives=3,inv=0,shield=0,rapid=0,bombs=1,earned=0,lost=0,score=0,kills=0;
@@ -450,7 +462,7 @@ const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scen
 function resize(){renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.fov=innerWidth<innerHeight?80:62;cam.updateProjectionMatrix()}
 addEventListener("resize",resize);resize();
 let camRoll=0,px0=0;let last=performance.now(),fT=0,fN=0,qLvl=0;const AUTOQ=!/q=hi/.test(location.search);
-function frame(t){const raw=Math.min(.05,(t-last)/1000);last=t;let dt=raw;if(phase=="win"&&st=="play")dt*=.45;if(st=="play"||st!="paused")update(dt);shake=Math.max(0,shake-raw*2);
+function frame(t){const raw=Math.min(.05,(t-last)/1000);last=t;let dt=raw;if(phase=="win"&&st=="play")dt*=.45;if(st=="play"||st!="paused")update(dt);shake=Math.max(0,shake-raw*2);updAmbient(raw,st=="play"?speed:8);
  const tx=st=="play"?sx*.55:0;cam.position.set(tx+(Math.random()-.5)*shake,st=="play"?5.3:4.2,st=="play"?10.8:9.5);cam.lookAt(tx*.6,.5,-14);camRoll+=((st=="play"?(sx-tgx)*.012+(sx-px0)*-.15:0)-camRoll)*Math.min(1,raw*6);px0=sx;cam.rotateZ(camRoll);composer.render();
  if(AUTOQ&&st=="play"){fT+=raw;fN++;if(fN>=90){const fps=fN/fT;fT=0;fN=0;if(fps<30&&qLvl<2){qLvl++;if(qLvl==1){bloom.enabled=false}else{PR=1;renderer.setPixelRatio(1);resize()}}}}
  requestAnimationFrame(frame)}
@@ -466,4 +478,3 @@ requestAnimationFrame(frame);
 </script>
 </body>
 </html>
-
