@@ -1,0 +1,50 @@
+name: Build APK
+on:
+  push:
+    branches: [main]
+    paths: ['index.html', 'models.js', '.github/workflows/apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Prepare web bundle (offline, three.js vendored)
+        run: |
+          npm init -y >/dev/null
+          npm i three@0.160.0 @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          mkdir -p www/lib
+          cp index.html models.js www/
+          cp node_modules/three/build/three.module.js www/lib/
+          cp -r node_modules/three/examples/jsm www/lib/jsm
+          sed -i 's#https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js#./lib/three.module.js#; s#https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/#./lib/jsm/#' www/index.html
+          grep -c "cdn.jsdelivr" www/index.html || true
+          echo '{"appId":"com.mohamed.galaxyrunner","appName":"Galaxy Runner","webDir":"www","android":{"allowMixedContent":false}}' > capacitor.config.json
+      - name: Build Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+          sed -i 's#<activity#<activity android:screenOrientation="portrait"#' android/app/src/main/AndroidManifest.xml
+          cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - name: Publish APK into repo
+        run: |
+          V=${{ github.run_number }}
+          mkdir -p apk
+          git rm -q --ignore-unmatch apk/galaxy-runner-v*.apk || true
+          cp android/app/build/outputs/apk/debug/app-debug.apk apk/galaxy-runner-v$V.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk apk/galaxy-runner-latest.apk
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add apk
+          git commit -m "APK build $V" || exit 0
+          git pull --rebase -q || true
+          git push
