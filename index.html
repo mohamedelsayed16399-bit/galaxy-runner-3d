@@ -385,7 +385,7 @@ function update(dt){
   if(o.t!="drone")o.m.position.x=o.x;o.m.position.z=o.z;if(PUS.has(o.t))o.m.position.y=.9+Math.sin(tt/200+o.ph)*.2;
   const px=o.m.position.x;
   if(PUS.has(o.t)){if(!o.dead&&Math.abs(o.z)<1.8&&Math.abs(px-sx)<1.7&&phase!="dead"){o.dead=true;if(o.t=="coin"){earned+=3;score+=5;popup(o.m.position,"+٣ ✦","#7ff");sfx("coin");boom(o.m.position,0xffe066,5)}else{sfx("power");wave(ship.position,o.t=="hp"?0x44ff77:o.t=="sh"?0x44aaff:o.t=="pc"?0xff66ff:o.t=="sp"?0x66ffaa:0xffdd33,10);if(o.t=="hp")lives=Math.min(maxLives,lives+1);if(o.t=="sh")shield=7;if(o.t=="rf")rapid=9;if(o.t=="pc"){pierce=10;banner("🔮 ليزر خارق!","",900,"#ff66ff")}if(o.t=="sp"){spread=10;banner("🌟 طلقات منتشرة!","",900,"#66ffaa")}if(o.t=="hm"){homing=10;banner("🎯 صواريخ موجّهة!","10 ثواني",900,"#ff9a55")}if(o.t=="wm"){wing=12;banner("🤝 طيارين مساعدين!","12 ثانية",900,"#33ffee")}if(o.t=="sl"){slowT=6;banner("⏳ الزمن بطيء!","6 ثواني",900,"#b28cff")}}hudHearts()}}
-  else{for(const b of buls){if(!b.dead&&!b.hits.has(o)&&Math.abs(b.z-o.z)<1.4&&Math.abs(b.x-px)<o.r){if(b.pierce)b.hits.add(o);else b.dead=true;o.hp-=b.d;boom(b.m.position,0xffffff,2,3);if(o.hp<=0&&!o.dead){kill(o)}}}
+  else{for(const b of buls){if(!b.dead&&!b.hits.has(o)&&Math.abs(b.z-o.z)<1.4&&Math.abs(b.x-px)<o.r){if(b.pierce)b.hits.add(o);else b.dead=true;o.hp-=b.d;boom(b.m.position,0xffffff,2,3);if(waves.length<14)wave(b.m.position,theme.c1?parseInt(theme.c1.slice(1),16):0xffffff,2.6);if(o.hp<=0&&!o.dead){kill(o)}}}
    if(!o.dead&&Math.abs(o.z)<1.7&&Math.abs(px-sx)<o.r+.5&&phase!="dead"){o.dead=true;boom(o.m.position,0xff8844,10);hurt(o.t=="kami"?1:1)}}
   if(o.z>9)o.dead=true}
  objs=objs.filter(o=>{if(o.dead){scene.remove(o.m);if(o.ln){scene.remove(o.ln);o.ln=null}return false}return true});
