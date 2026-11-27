@@ -278,7 +278,7 @@ function addCarrier(x,z){const ch=14+wi*6,c=addObj("drone",x,z,{shoot:true,hp:ch
 function addSplit(x,z){const o=addObj("rock",x,z,{split:true});o.hp=o.max=4+wi*2;o.m.scale.multiplyScalar(1.25);const g=glowSprite("#ff44cc",6,.55);g.position.set(0,0,0);o.m.add(g);return o}
 function form(){const W=wi,pr=endlessMode?Math.min(1,.25+runDist/2500):runDist/stageLen,r=Math.random();const rx=()=>rnd(-XMAX+.4,XMAX-.4);
  const tbl=[[["rocks",4],["drones",3],["coins",3]],[["rocks",2],["drones",4],["vee",3],["mines",2],["coins",2]],[["rocks",2],["wall",4],["drones",2],["mines",2],["snipe",2],["hole",1],["coins",2]],[["kami",4],["drones",3],["vee",2],["mines",2],["snipe",2],["hole",1],["rocks",1],["coins",2]],[["rocks",1],["wall",2],["kami",3],["vee",3],["mines",3],["drones",2],["snipe",2],["hole",2],["coins",2]]][W];
-if(W>=1)tbl.push(["split",2]);if(W>=2&&pr>.15)tbl.push(["carrier",2]);
+if(W>=1)tbl.push(["split",2]);if(W>=2&&pr>.15)tbl.push(["carrier",2]);if(W>=1)tbl.push(["blink",2]);
  let tot=0;tbl.forEach(a=>tot+=a[1]);let q=Math.random()*tot,f="rocks";for(const a of tbl){q-=a[1];if(q<=0){f=a[0];break}}
  const z=FAR;
  if(f=="rocks"){const n=1+Math.floor(Math.random()*(1+pr*2));for(let i=0;i<n;i++)addObj("rock",rx(),z-i*7)}
@@ -288,6 +288,7 @@ else if(f=="split"){const n=1+(pr>.5?1:0);for(let i=0;i<n;i++)addSplit(rx(),z-i*
  else if(f=="snipe"){if(!objs.some(o=>o.t=="sniper"))addObj("sniper",rnd(-2,2),z)}
  else if(f=="hole"){if(!objs.some(o=>o.t=="hole"))addObj("hole",(Math.random()<.5?-1:1)*5.6,z)}
  else if(f=="mines"){const n=2+(pr>.5?1:0),x0=rnd(-2.5,2.5);for(let i=0;i<n;i++)addObj("mine",clamp(x0+(i-(n-1)/2)*2.6,-XMAX,XMAX),z-i*5)}
+ else if(f=="blink"){const x0=rnd(-2,2);for(let i=0;i<2;i++){const d=addObj("drone",clamp(x0+(i?2.4:-2.4),-XMAX,XMAX),z-i*3,{shoot:true,blink:true});d.m.traverse(c=>{if(c.material&&c.material.color&&!c.isSprite){c.material=c.material.clone();c.material.color.lerp(new THREE.Color(0xaa66ff),.5)}})}}
  else if(f=="carrier"){if(!objs.some(o=>o.carrier))addCarrier(rnd(-1.5,1.5),z-4)}
  else if(f=="kami"){for(let i=0;i<2+(pr>.5?1:0);i++)addObj("kami",rx(),z-i*9)}
  else if(f=="wall"){const gap=Math.floor(Math.random()*4);for(let i=0;i<4;i++){if(i==gap)continue;addObj("rock",-XMAX+.3+i*(XMAX*2-.6)/3,z)}}
@@ -375,7 +376,7 @@ function update(dt){
   if(o.t=="rock"){o.m.rotation.y+=dt*.8;o.m.rotation.x+=dt*.5}
   else if(o.t=="coin"){o.m.rotation.y+=dt*3;
    const dx=sx-o.x,dz=0-o.z,d=Math.hypot(dx,dz),mr=2.5+S.up.mag*2.8;if(d<mr&&phase!="dead"){const k=Math.min(1,(18+S.up.mag*6)*dt/Math.max(d,.5));o.x+=dx*k;o.z+=dz*k*.6}}
-  else if(o.t=="drone"){o.m.rotation.z=Math.sin(tt/300+o.ph)*.5;o.m.position.x=clamp(o.x+Math.sin(tt/500+o.ph)*1.3,-XMAX-.5,XMAX+.5);
+  else if(o.t=="drone"){if(o.blink){o.bt=(o.bt==null?1.2:o.bt)-dt;o.m.visible=!(o.bt<.3&&Math.floor(tt/70)%2);if(o.bt<=0){o.bt=1.4;o.m.visible=true;o.x=clamp(rnd(-XMAX,XMAX),-XMAX,XMAX);boom(o.m.position,0xaa66ff,6)}}o.m.rotation.z=Math.sin(tt/300+o.ph)*.5;o.m.position.x=clamp(o.x+Math.sin(tt/500+o.ph)*1.3,-XMAX-.5,XMAX+.5);
    if(o.shoot&&o.z>-70&&o.z<-14){o.cd-=dt;if(o.cd<=0){o.cd=rnd(2.4,3.6)-wi*.15;const T=(0-o.z)/18;ebul(o.m.position.x,o.z,clamp((sx-o.m.position.x)/T,-7,7),18,.3);if(o.elite){for(const a of[-4.5,4.5])ebul(o.m.position.x,o.z,a,18,.3)}}}}
   else if(o.t=="kami"){o.x+=clamp(sx-o.x,-1,1)*Math.min(3.2,Math.abs(sx-o.x)*3)*dt*(o.z>-60?1:.3);o.m.rotation.z=(sx-o.x)*.2}
    else if(o.t=="sniper"){o.life=(o.life||0)+dt;if(o.ch===undefined)o.ch=-1;if(o.life<10&&o.z>-44)o.z=-44;if(o.life<10){o.x=clamp(Math.sin(o.life*.7+o.ph)*3.2,-XMAX,XMAX);o.m.position.z=o.z}
@@ -475,7 +476,7 @@ function frame(t){const raw=Math.min(.05,(t-last)/1000);last=t;let dt=raw;if(pha
  requestAnimationFrame(frame)}
 window.G={bombs:()=>bombs,mus:()=>musI,setL:n=>{lives=n;hudHearts()},ach:()=>checkAch(),ms:()=>({ms:S.ms,tk:S.tk,gz:S.gz}),ens:()=>{ensureMs();return S.ms},storm:()=>{stormT=0},giveHm:()=>{homing=10},x2:()=>({homing,bolts:bolts.length,autoSh}),spl:(x,z)=>addSplit(x,z),
 bw:()=>bossWall(boss),
-killFirst:t=>{const o=[...objs].reverse().find(q=>q.t==t&&!q.dead);if(o)kill(o);return !!o},carrier:(x,z)=>addCarrier(x==null?0:x,z==null?-45:z),spawn:(t,x,z)=>addObj(t,x==null?0:x,z==null?-12:z),x:()=>({wing,slowT,graze,half,tk:S.tk,bk:S.bk}),get s(){return{st,phase,lives,earned,lost,boss:boss?Math.round(boss.hp):null,objs:objs.length,run:Math.round(runDist),wi}},S:()=>S,start:i=>startStage(i),map:()=>toMap(),shop:()=>toShop(0),god:v=>{G_god=v!==false},setS:o=>{Object.assign(S,o);save()},skip(){runDist=stageLen},hitBoss(n){if(boss)boss.hp-=n},bomb,pos(){return {sx,tgx,boss:boss?{x:boss.x,z:boss.z}:null}},aim(){const t=objs.filter(o=>!PUS.has(o.t)).sort((a,b)=>b.z-a.z).find(o=>o.z<-2);if(boss&&boss.ready)tgx=boss.x;else if(t)tgx=t.m.position.x;else tgx=0},bot(on){window.__bot=on},sim(sec,bot=true){const n=Math.round(sec/.05);for(let k=0;k<n&&st=="play";k++){if(bot)botStep();update(.05)}}};
+killFirst:t=>{const o=[...objs].reverse().find(q=>q.t==t&&!q.dead);if(o)kill(o);return !!o},carrier:(x,z)=>addCarrier(x==null?0:x,z==null?-45:z),blink:()=>{const d=addObj('drone',0,-25,{shoot:true,blink:true});return !!d},spawn:(t,x,z)=>addObj(t,x==null?0:x,z==null?-12:z),x:()=>({wing,slowT,graze,half,tk:S.tk,bk:S.bk}),get s(){return{st,phase,lives,earned,lost,boss:boss?Math.round(boss.hp):null,objs:objs.length,run:Math.round(runDist),wi}},S:()=>S,start:i=>startStage(i),map:()=>toMap(),shop:()=>toShop(0),god:v=>{G_god=v!==false},setS:o=>{Object.assign(S,o);save()},skip(){runDist=stageLen},hitBoss(n){if(boss)boss.hp-=n},bomb,pos(){return {sx,tgx,boss:boss?{x:boss.x,z:boss.z}:null}},aim(){const t=objs.filter(o=>!PUS.has(o.t)).sort((a,b)=>b.z-a.z).find(o=>o.z<-2);if(boss&&boss.ready)tgx=boss.x;else if(t)tgx=t.m.position.x;else tgx=0},bot(on){window.__bot=on},sim(sec,bot=true){const n=Math.round(sec/.05);for(let k=0;k<n&&st=="play";k++){if(bot)botStep();update(.05)}}};
 function botStep(){// dodge: avoid enemy bullets & rocks near, else aim
  let tgt=null;if(boss&&boss.ready)tgt=boss.x;else{const t=objs.filter(o=>(o.t=="drone"||o.t=="kami")&&o.z<-6).sort((a,b)=>b.z-a.z)[0];const c=objs.filter(o=>o.t=="coin"&&o.z<-3&&o.z>-30).sort((a,b)=>b.z-a.z)[0];tgt=t?t.m.position.x:c?c.x:0}
  const danger=[...ebs.filter(e=>e.z>-22&&e.z<2),...objs.filter(o=>(o.t=="rock"||o.t=="drone"||o.t=="kami"||o.t=="mine")&&o.z>-24&&o.z<2)];let best=tgt,bs=1e9;for(let x=-XMAX;x<=XMAX;x+=.5){let pen=Math.abs(x-tgt)*.6;for(const d of danger){const dx=Math.abs((d.m?d.m.position.x:d.x)-x);const lim=d.t=="rock"||d.t=="drone"||d.t=="kami"||d.t=="mine"?2.8:1.8;if(dx<lim)pen+=(lim-dx)*(30-Math.abs(d.z))*1.5}if(beam&&Math.abs(beam.x-x)<2.4)pen+=200;for(const q of objs)if(q.t=="hole"&&q.z>-30&&Math.abs(x)>3.6)pen+=60;for(const q of bolts)if(q.t<1.45&&Math.abs(q.x-x)<2.2)pen+=250;pen+=Math.abs(x-tgx)*.15;if(pen<bs){bs=pen;best=x}}tgx=best}
